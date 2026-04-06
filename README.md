@@ -9,7 +9,7 @@ This is **not** the full SINDY Engineering Toolkit—only the packages and modul
 | Path | Role |
 |------|------|
 | `lorenz/` | Lorenz simulation, `SINDySystemModel` bridge, SINDy configs, forward integration + 3D plots |
-| `sindy/` | Library, STLSQ/Pareto/BIC fit, pipeline runner, diagnostic figures |
+| `sindy/` | Library, STLSQ/Pareto/BIC fit, pipeline runner, diagnostic figures (no `physics_filters`—Lorenz does not use `library_keep_feature`) |
 | `idtools/` | Preprocessing (incl. identity scaler), truth comparison, excitation + auto-config hooks used by the pipeline |
 | `run_lorenz.py` | CLI entry: BIC fit, ensemble fit, optional auto/fixed baselines, `compare_to_truth`, 3D PNGs under `outputs/lorenz/` |
 | `Run_Lorenz.ipynb` | Notebook version of the same workflow |

@@ -188,7 +188,7 @@ class SINDyRunConfig:
     small_angle_control_names: Optional[List[str]] = None  # e.g. ["T_act", "elv_act"]
 
     # Optional: curate polynomial/trig library by feature name before Θ is built (classic SINDy
-    # only; see e.g. sindy.physics_filters.aircraftsim_physics_informed_keep_feature).
+    # only; optional ``library_keep_feature`` callback can prune Θ by feature name).
     library_keep_feature: Optional[Callable[[str], bool]] = None
     # If False, :class:`~sindy.library.SINDyLibrary` omits the leading ``"1"`` column (no intercept).
     # Option 2 NF sets False: Newton–Euler specific force should not include a levitation bias at rest.
