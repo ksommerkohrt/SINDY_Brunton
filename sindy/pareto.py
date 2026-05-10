@@ -238,3 +238,100 @@ def plot_pareto_frontier(
 
     return ax
 
+
+def plot_bic_selection(
+    fit: Dict[str, Any],
+    *,
+    title: str = "",
+    out_path: Optional[str] = None,
+) -> Tuple[Any, Any]:
+    """
+    Two-panel figure showing how BIC selects the model from the STLSQ threshold sweep.
+
+    Top panel  — NMSE vs complexity (log y): all sweep points (grey), Pareto-optimal
+                 frontier (blue line), and BIC-selected model (red star).
+    Bottom panel — BIC score vs complexity: all sweep points (grey dots), BIC curve
+                   connecting unique complexities (blue), and selected minimum (red star).
+
+    Uses ``fit["pareto"]`` (full sweep, 50 dicts with ``mse``, ``complexity``, ``threshold``),
+    ``fit["bic_scores"]`` (parallel array), ``fit["var_y"]``, ``fit["best_complexity"]``.
+    """
+    pareto_list = fit.get("pareto") or []
+    var_y       = float(fit.get("var_y", 1.0))
+    best_c      = int(fit.get("best_complexity", 0))
+    eps         = 1e-12
+
+    if not pareto_list:
+        raise ValueError("fit dict missing 'pareto' sweep data")
+
+    n_obs = float(fit.get("n_obs") or max(1, len(pareto_list)))
+
+    raw_bic = fit.get("bic_scores")
+    bic_posthoc = raw_bic is None or (hasattr(raw_bic, "__len__") and len(raw_bic) == 0)
+    if bic_posthoc:
+        # Compute BIC post-hoc: used when dial-based selection was chosen instead of BIC
+        bic_scores = np.array(
+            [bic_for_sindy_sweep_candidate(float(r["mse"]), int(r["complexity"]), n_obs, mse_floor=0.0)
+             for r in pareto_list],
+            dtype=float,
+        )
+    else:
+        bic_scores = np.asarray(raw_bic, dtype=float)
+
+    # Sort full sweep by complexity then mse for consistent plotting
+    order = sorted(range(len(pareto_list)), key=lambda i: (pareto_list[i]["complexity"], pareto_list[i]["mse"]))
+    sweep_c    = np.array([pareto_list[i]["complexity"] for i in order], dtype=float)
+    sweep_nmse = np.array([pareto_list[i]["mse"]        for i in order], dtype=float) / (var_y + eps)
+    sweep_bic  = bic_scores[order]
+
+    # Pareto-optimal front: for each unique complexity, keep the lowest NMSE point
+    unique_c  = np.unique(sweep_c)
+    front_c, front_nmse, front_bic = [], [], []
+    for uc in unique_c:
+        mask = sweep_c == uc
+        best_idx = np.argmin(sweep_nmse[mask])
+        front_c.append(uc)
+        front_nmse.append(sweep_nmse[mask][best_idx])
+        front_bic.append(sweep_bic[mask][np.argmin(sweep_bic[mask])])
+    front_c    = np.array(front_c)
+    front_nmse = np.array(front_nmse)
+    front_bic  = np.array(front_bic)
+
+    # Selected point indices
+    bic_min_idx   = int(np.argmin(sweep_bic))
+    sel_c         = sweep_c[bic_min_idx]
+    sel_nmse      = sweep_nmse[bic_min_idx]
+    sel_bic       = sweep_bic[bic_min_idx]
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 7), sharex=False)
+
+    # ── Top: NMSE vs complexity ──────────────────────────────────────────────
+    ax1.scatter(sweep_c, sweep_nmse, s=18, color="grey", alpha=0.45, zorder=2, label="All sweep points")
+    ax1.plot(front_c, front_nmse, "o-", ms=5, lw=1.4, color="#1f77b4", zorder=3, label="Pareto front")
+    ax1.plot(sel_c, sel_nmse, "*", ms=14, color="#d62728", zorder=5, label=f"BIC selected (k={int(sel_c)})")
+    ax1.axvline(sel_c, color="#d62728", lw=0.8, ls="--", alpha=0.5)
+    ax1.set_yscale("log")
+    ax1.set_ylabel("NMSE  (MSE / Var(y))", fontsize=9)
+    ax1.set_title(title or "BIC model selection", fontsize=10)
+    ax1.legend(fontsize=8, loc="upper right")
+    ax1.grid(True, alpha=0.25)
+
+    # ── Bottom: BIC vs complexity ────────────────────────────────────────────
+    bic_note = " (post-hoc)" if bic_posthoc else ""
+    ax2.scatter(sweep_c, sweep_bic, s=18, color="grey", alpha=0.45, zorder=2, label="All sweep points")
+    ax2.plot(front_c, front_bic, "o-", ms=5, lw=1.4, color="#1f77b4", zorder=3, label=f"Min BIC per complexity{bic_note}")
+    ax2.plot(sel_c, sel_bic, "*", ms=14, color="#d62728", zorder=5, label=f"Min BIC  (k={int(sel_c)})")
+    ax2.axvline(sel_c, color="#d62728", lw=0.8, ls="--", alpha=0.5)
+    ax2.set_xlabel("Complexity  (# nonzero coefficients)", fontsize=9)
+    ax2.set_ylabel("BIC score", fontsize=9)
+    ax2.legend(fontsize=8, loc="upper right")
+    ax2.grid(True, alpha=0.25)
+
+    formula = r"$\mathrm{BIC} = n \ln(\mathrm{MSE}) + k \ln(n)$"
+    ax2.text(0.02, 0.04, formula, transform=ax2.transAxes, fontsize=8, color="#555555")
+
+    fig.tight_layout(h_pad=2.5)
+    if out_path:
+        fig.savefig(out_path, dpi=160, bbox_inches="tight")
+    return fig, (ax1, ax2)
+

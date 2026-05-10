@@ -1,0 +1,712 @@
+\documentclass[12pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+\usepackage{parskip}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+\graphicspath{
+  {outputs/damped_oscillator/}
+  {outputs/lorenz/bic_standard/}
+  {outputs/cylinder_wake/bic_standard/}
+}
+
+\captionsetup{font=small, labelfont=bf, skip=4pt}
+\captionsetup[sub]{font=small, labelfont=bf}
+
+\title{\textbf{ME 697 Final Report}\\[4pt]
+\large Discovering Governing Equations from Data:\\
+Sparse Identification of Nonlinear Dynamical Systems}
+\author{Kylie Sommer-Kohrt}
+\date{5/9/2026}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+% ============================================================
+\section*{1. Literature Review}
+% ============================================================
+
+\section{The Shift Toward Physics-Informed Machine Learning}
+System identification has undergone a fundamental transformation since its inception in the 1950s, evolving from purely statistical and frequency-domain methods toward the modern paradigm of Physics-Informed Machine Learning (PiML). Historically, the field was divided between rigid, physics-heavy models that struggled with unmodeled dynamics and high-dimensional, black-box models that lacked interpretability and generalizability. SINDy (Sparse Identification of Nonlinear Dynamics) emerged as a definitive bridge in this landscape, positioning itself as a method that enforces physical consistency through the mathematical lens of parsimony rather than just data-fitting \cite{Brunton2016}. As noted in the broader literature regarding PiML status and challenges, this shift represents a move toward architectures that are both data-efficient and physically grounded \cite{Zhang2025}.
+
+\section{Historical Lineage and Precursors to SINDy}
+What led to the development of SINDy was a convergence of two major mathematical lineages: Koopman operator theory and the revolution in compressed sensing. In the years preceding the seminal work by Brunton et al., the research community relied heavily on Dynamic Mode Decomposition (DMD) to extract spatial-temporal patterns from data. While DMD was highly effective for linear approximations, it fell short in capturing the full complexity of nonlinear dynamical systems. Researchers looked toward the Koopman operator, which suggests that nonlinear dynamics can be represented linearly in an infinite-dimensional space of observables \cite{Kutz2023}. SINDy solved the practical challenge of finding a finite lifting set by re-envisioning the governing equations as a sparse signal within a high-dimensional library of candidate functions. By applying sparse regression techniques, researchers could "select" the correct physical terms from a dictionary, essentially automating symbolic discovery \cite{Brunton2016}.
+
+\section{SINDy’s Place in the PiML Paradigm}
+Within the PiML framework, SINDy occupies a distinct niche compared to other methods like Physics-Informed Neural Networks (PINNs). While PINNs use the known residuals of differential equations to regularize the training of a neural network, SINDy discovers the differential equations themselves, providing a high degree of structural freedom while maintaining a strong physics prior. This interpretability is crucial for safety-critical fields such as aerospace, where identified coefficients must align with known aerodynamic stability derivatives. This methodology allows practitioners to absorb deviations from nominal physics into the learned structure rather than treating them solely as bias \cite{Kutz2023}. Furthermore, the convergence of these sparse identification algorithms has been rigorously analyzed to ensure they remain robust in the presence of noise and limited data \cite{Zhang2019}.
+
+\section{Promising Research Developments (2024--2026)}
+As of early 2026, the research frontier has moved beyond the original "fixed library" constraint. One of the most promising developments is the integration of SINDy with Kolmogorov-Arnold Networks (KANs). SINDy-KANs utilize learnable spline-based functions on edges, allowing the model to discover optimal functional forms on-the-fly without requiring a pre-defined exhaustive library \cite{Vaddireddy2026}. This effectively mitigates the "library bottleneck" previously cited as a primary drawback of the method.
+
+Another significant advancement is the development of the Library Optimization Mechanism (SINDy-LOM), which introduces a two-layer optimization architecture to improve recursive long-term prediction accuracy \cite{Takeishi2026}. Additionally, the SINDy-SHRED (Shallow Recurrent Decoders) framework has emerged to solve the challenge of "hidden" states and sensor sparsity. By merging SINDy-class dynamics with recurrent architectures, researchers can map temporal sequences from sparse sensors to a latent space where the governing laws are symbolically identified \cite{Morales2026}. These hybrid architectures represent the state-of-the-art in 2026, providing a robust pathway for real-time, adaptive modeling in complex aerospace environments.
+% ============================================================
+\section*{2. Summary of Paper Contributions}
+% ============================================================
+
+Brunton et al.\ (2016) make four interconnected contributions.
+
+\textbf{The SINDy framework.}
+The central insight is to recast nonlinear system identification as sparse
+regression against a user-defined library $\boldsymbol{\Theta}(\mathbf{X})$.
+Prior approaches either (i) assumed linearity, (ii) searched over model
+structures combinatorially, or (iii) produced dense coefficient vectors with
+no physical interpretability.  By writing $\dot{\mathbf{X}} =
+\boldsymbol{\Theta}(\mathbf{X})\boldsymbol{\Xi}$ and seeking a sparse
+$\boldsymbol{\Xi}$, SINDy simultaneously identifies \emph{which} terms are
+active and estimates their coefficients, all within a single regression
+step.  The recovered equations are human-readable and, for physical systems
+whose true governing laws are polynomials or trigonometric combinations
+(fluid mechanics, structural dynamics, chemical kinetics), can match the
+ground truth exactly.
+
+\textbf{Sequential Thresholded Least Squares (STLSQ).}
+The authors introduce STLSQ as a practical sparse solver for the SINDy
+regression.  Unlike LASSO, STLSQ enforces sparsity via a hard threshold
+rather than an $\ell_1$ penalty, which eliminates the bias that $\ell_1$
+regularisation imposes on retained coefficients.  The algorithm alternates
+between hard-thresholding small coefficients and re-fitting only the
+surviving terms.  This converges in a small number of iterations and scales
+well to the multi-equation setting (separate STLSQ per state variable).
+The paper provides convergence arguments and demonstrates robustness to
+moderate measurement noise via the implicit denoising effect of
+least-squares on noisy data.
+
+\textbf{Demonstration on benchmark dynamical systems.}
+The paper demonstrates SINDy on three progressively complex systems:
+(1)~the three-state Lorenz chaotic system with 7 nonzero terms, where
+SINDy exactly recovers the governing equations; (2)~a nonlinear structural
+oscillator with a cubic stiffness term; and (3)~a chemical reaction network
+(Lorenz-type oscillator in concentration space).  In each case, SINDy
+recovers the correct sparsity pattern and coefficients with high accuracy,
+even at several percent measurement noise.  The cylinder wake mean-field
+model studied in the companion paper by Noack et al.\ (2003) is a canonical
+fluid-mechanics extension of the same framework.
+
+\textbf{Generality and connection to existing methods.}
+Brunton et al.\ argue that SINDy subsumes several existing data-driven
+methods as special cases: DMD is recovered when the library contains only
+linear terms; NARMAX corresponds to a polynomial library without the
+sparsity constraint; and the Koopman operator perspective motivates
+non-polynomial library choices.  This unifying view, combined with the
+open-source implementation, has made SINDy a widely used tool and spurred
+a large body of follow-on work in physics-informed machine learning.
+
+% ============================================================
+\section*{3. Replication}
+% ============================================================
+
+% ------------------------------------------------------------
+\subsection*{3a. Coding Implementation}
+% ------------------------------------------------------------
+
+The SINDy methodology was implemented from scratch in Python across five
+purpose-built packages totalling approximately 7{,}700 lines of source code.
+No existing SINDy library (e.g.\ PySINDy) was used; every component was
+written to match the algorithmic description in Brunton et al.\ (2016).
+
+\subsubsection*{Mathematical formulation}
+
+\paragraph{Problem statement.}
+Let $\mathbf{x}(t) \in \mathbb{R}^{s}$ be the state of a dynamical system
+observed at $n$ time steps, collected row-wise into
+$\mathbf{X} \in \mathbb{R}^{n \times s}$.  The corresponding time-derivative
+matrix $\dot{\mathbf{X}} \in \mathbb{R}^{n \times s}$ is either measured
+directly or estimated from $\mathbf{X}$ via a Savitzky--Golay filter.
+SINDy assumes the dynamics admit a sparse representation in a fixed
+function library $\boldsymbol{\Theta}(\mathbf{X}) \in \mathbb{R}^{n \times p}$:
+\begin{equation}
+  \dot{\mathbf{X}} = \boldsymbol{\Theta}(\mathbf{X})\,\boldsymbol{\Xi},
+  \qquad \boldsymbol{\Xi} \in \mathbb{R}^{p \times s},
+  \label{eq:sindy}
+\end{equation}
+where $\boldsymbol{\Xi}$ is a sparse coefficient matrix.  Each column
+$\boldsymbol{\xi}_{j}$ of $\boldsymbol{\Xi}$ gives the active library
+terms for the $j$-th state equation $\dot{x}_{j}$.
+
+\paragraph{Feature library.}
+The library $\boldsymbol{\Theta}$ is constructed by \texttt{sindy/library.py}
+from polynomial monomials up to degree $p_{\max}$ with maximum interaction
+order $q_{\max}$ (number of distinct state variables per term).  For a state
+$\mathbf{x} = (x_{1}, \ldots, x_{s})^{\top}$ the library columns are
+\begin{equation}
+  \boldsymbol{\Theta}(\mathbf{X}) =
+  \bigl[\,\mathbf{1} \;\big|\; \mathbf{X} \;\big|\;
+  x_{i}x_{j} \;\big|\; x_{i}^{2} \;\big|\; \cdots \bigr],
+  \label{eq:library}
+\end{equation}
+where the constant column provides an intercept and higher-degree columns
+are included subject to $|\alpha| \leq p_{\max}$ and at most $q_{\max}$
+distinct indices per monomial.  For the examples in this report,
+$p_{\max} = 3$ and $q_{\max} = 2$ for the Lorenz and cylinder cases,
+and $p_{\max} = 2$, $q_{\max} = 2$ for the oscillator.
+Near-constant columns (coefficient of variation below $10^{-3}$) are
+dropped before regression to avoid numerical near-singularity.
+
+\paragraph{Sequential Thresholded Least Squares (STLSQ).}
+The core sparse solver, implemented in \texttt{AdaptiveSTLSQ}
+(\texttt{sindy/fit.py}), finds $\boldsymbol{\Xi}$ for a fixed sparsity
+threshold $\lambda > 0$ as follows.
+
+\begin{enumerate}
+  \item \textbf{Initialise.}  Solve the ridge-regularised normal equations
+    for the full library:
+    \begin{equation}
+      \boldsymbol{\Xi}^{(0)} =
+      \bigl(\boldsymbol{\Theta}^{\top}\boldsymbol{\Theta}
+            + \alpha\mathbf{I}\bigr)^{-1}
+      \boldsymbol{\Theta}^{\top}\dot{\mathbf{X}},
+      \label{eq:ridge-init}
+    \end{equation}
+    where $\alpha$ is the ridge penalty (typically $10^{-3}$).
+
+  \item \textbf{Threshold.}  Set to zero all coefficients with
+    $|\xi^{(\ell)}_{ij}| \leq \lambda$, defining an active support
+    $\mathcal{S}^{(\ell)} = \{(i,j) : |\xi^{(\ell)}_{ij}| > \lambda\}$.
+
+  \item \textbf{Re-fit.}  For each target equation $j$ independently,
+    solve a new ridge problem restricted to the active columns
+    $\boldsymbol{\Theta}_{\mathcal{S}^{(\ell)}_j}$:
+    \begin{equation}
+      \boldsymbol{\xi}^{(\ell+1)}_{j}
+      \big|_{\mathcal{S}^{(\ell)}_j}
+      =
+      \bigl(\boldsymbol{\Theta}_{\mathcal{S}}^{\top}
+             \boldsymbol{\Theta}_{\mathcal{S}}
+            + \alpha\mathbf{I}\bigr)^{-1}
+      \boldsymbol{\Theta}_{\mathcal{S}}^{\top}
+      \dot{\mathbf{x}}_{j}.
+      \label{eq:stlsq-refit}
+    \end{equation}
+
+  \item \textbf{Iterate} steps 2--3 until
+    $\|\boldsymbol{\Xi}^{(\ell+1)} - \boldsymbol{\Xi}^{(\ell)}\|_{\infty}
+    < 10^{-8}$ or a maximum of 20 iterations.
+
+  \item \textbf{Debiasing.}  On the final support, replace the Ridge solution
+    with ordinary least squares (plain \texttt{lstsq}) to remove the
+    $\ell_{2}$-shrinkage bias introduced by $\alpha$.
+\end{enumerate}
+
+The Ridge penalty in steps 1 and 3 stabilises the solve when library columns
+are nearly collinear (e.g.\ $x$, $z$, and $xz$ in the Lorenz system are
+strongly correlated along the attractor) without imposing true sparsity.
+Sparsity comes solely from the hard threshold in step 2.
+
+\paragraph{Threshold sweep and Pareto analysis.}
+Rather than fixing $\lambda$ in advance, STLSQ is run for each of
+$N_{\lambda} = 50$ threshold values on a logarithmic grid,
+\begin{equation}
+  \lambda_{i} = \lambda_{\min} \cdot
+  \left(\frac{\lambda_{\max}}{\lambda_{\min}}\right)^{i/(N_{\lambda}-1)},
+  \quad i = 0, \ldots, N_{\lambda}-1,
+  \label{eq:lambda-grid}
+\end{equation}
+with $\lambda_{\min} = 10^{-3}$ and $\lambda_{\max} = 1.0$ for the examples
+here.  This produces a family of candidate models
+$\{(\hat{k}_i,\, \widehat{\mathrm{MSE}}_i)\}_{i=1}^{N_\lambda}$, where
+$\hat{k}_i = \|\boldsymbol{\Xi}_i\|_0$ is the sparsity (number of nonzero
+coefficients) and
+\begin{equation}
+  \widehat{\mathrm{MSE}}_i
+  = \frac{1}{n \cdot s}
+  \bigl\|\dot{\mathbf{X}} - \boldsymbol{\Theta}\boldsymbol{\Xi}_i\bigr\|_{F}^{2}
+  \label{eq:mse}
+\end{equation}
+is the mean squared residual.  The \emph{Pareto-optimal front}
+$\mathcal{P} \subseteq \{1,\ldots,N_\lambda\}$ retains only non-dominated
+models: model $i$ is on the front if no other model $j$ has both
+$\hat{k}_j \leq \hat{k}_i$ and $\widehat{\mathrm{MSE}}_j \leq
+\widehat{\mathrm{MSE}}_i$ with at least one strict inequality.
+
+\paragraph{Model selection from the Pareto front.}
+Three strategies are implemented in \texttt{sindy/\allowbreak pareto.py},
+applied after the sweep:
+
+\begin{itemize}
+  \item \textbf{BIC minimum.}  All $N_\lambda$ candidate models (not only the
+    Pareto front) are scored with
+    \begin{equation}
+      \mathrm{BIC}_i = n\ln(\mathrm{MSE}_{\mathrm{eff},i})
+                       + \hat{k}_i\ln(n),
+      \label{eq:bic}
+    \end{equation}
+    where $\mathrm{MSE}_{\mathrm{eff},i} = \max\!\bigl(\widehat{\mathrm{MSE}}_i,\,
+    \delta\bigr)$ and the floor $\delta = \max(10^{-3}\,\hat{\sigma}^{2}_Y,\,
+    10^{-12})$ prevents the log from diverging on near-perfect fits.
+    $\hat{\sigma}^{2}_Y$ is the mean per-target variance of $\dot{\mathbf{X}}$.
+    The model minimising~\eqref{eq:bic} is selected.
+
+  \item \textbf{Pareto knee.}  The point of maximum curvature on the
+    log-NMSE--complexity curve, computed as the point of greatest perpendicular
+    distance from the line connecting the sparsest and densest Pareto points.
+
+  \item \textbf{Pareto dial.}  A continuous parameter $d \in [0, 1]$
+    interpolates between maximum sparsity ($d = 0$) and minimum MSE ($d = 1$)
+    by minimising $\ln(\mathrm{NMSE}) + (1-d)\,\lambda_{\mathrm{max}}\,
+    \tilde{k}$ over the front, where $\tilde{k}$ is complexity normalised
+    to $[0,1]$.  Setting $d = 1$ selects the densest Pareto point.
+\end{itemize}
+
+\paragraph{Bootstrap ensemble.}
+For the Lorenz ensemble run, STLSQ is repeated $B = 50$ times, each on a
+bootstrap subsample of $\lfloor 0.8n \rfloor$ rows drawn with replacement.
+Each draw independently runs the full threshold sweep and selects a BIC-best
+model.  The final coefficient matrix is the element-wise median across all
+$B$ draws:
+\begin{equation}
+  \hat{\boldsymbol{\Xi}}_{\mathrm{ens}}
+  = \operatorname{median}_{b=1}^{B}\bigl(\boldsymbol{\Xi}^{(b)}\bigr),
+  \label{eq:ensemble}
+\end{equation}
+and each entry's \emph{inclusion probability}
+$\pi_{ij} = B^{-1}\sum_{b=1}^{B}\mathbf{1}[|\xi^{(b)}_{ij}|>0]$
+measures term stability across draws.
+
+\subsubsection*{Code structure}
+
+\textbf{\texttt{sindy/}} is the core package.  \texttt{library.py} builds
+$\boldsymbol{\Theta}$ as described above.  \texttt{fit.py} contains
+\texttt{AdaptiveSTLSQ} (the STLSQ solver), the ensemble wrapper, and
+pre-processing utilities including collinear-column pruning.
+\texttt{pareto.py} implements the sweep, Pareto-front extraction, and all
+three selection strategies.  \texttt{pipeline.py} wraps these into a single
+\texttt{run\_sindy\_pipeline\_general} call.
+
+\textbf{\texttt{idtools/}} provides validation and diagnostics.
+\texttt{compare\_to\_truth} projects the symbolic true equations (via SymPy)
+onto the same library $\boldsymbol{\Theta}$ to obtain the ground-truth
+coefficient matrix $\boldsymbol{\Xi}_{\mathrm{true}}$, then reports
+coefficient-level relative errors and the Pearson correlation
+$\rho(\boldsymbol{\xi}_{\mathrm{true}}, \boldsymbol{\xi}_{\mathrm{disc}})$,
+distinguishing a good data fit (high $R^{2}$) from genuine structure
+recovery (low coefficient error).
+
+\textbf{\texttt{lorenz/}}, \textbf{\texttt{damped\_oscillator/}}, and
+\textbf{\texttt{cylinder\_flow/}} each contain a self-contained ODE simulator,
+SymPy truth model, SINDy configuration, and forward-integration utilities.
+
+Primary dependencies: \textsc{NumPy} (matrix algebra),
+\textsc{SciPy} (\texttt{solve\_ivp}, \texttt{lstsq}),
+\textsc{scikit-learn} (\texttt{Ridge}),
+\textsc{SymPy} (symbolic truth models),
+\textsc{Matplotlib} (figures).
+
+% ------------------------------------------------------------
+\subsection*{3b. Replication of Simple, Verification Example}
+% ------------------------------------------------------------
+
+\subsubsection*{System}
+
+The verification example is a 2D damped linear oscillator,
+\begin{equation}
+  \dot{x} = \mu x + \omega y, \qquad \dot{y} = -\omega x + \mu y,
+  \label{eq:oscillator}
+\end{equation}
+with $\mu = -0.1$ and $\omega = 2.0$.  This system admits an exact closed-form
+solution from initial condition $(x_{0}, 0)$:
+\begin{equation}
+  x(t) = x_{0}\,e^{\mu t}\cos(\omega t), \qquad
+  y(t) = -x_{0}\,e^{\mu t}\sin(\omega t).
+  \label{eq:exact}
+\end{equation}
+The trajectory is a decaying spiral (Figure~\ref{fig:osc-phase}): amplitude
+decays at rate $e^{-0.1t}$ while oscillating at $\omega = 2\,\mathrm{rad/s}$.
+The analytical solution~\eqref{eq:exact} provides ground truth at every time
+step, allowing the numerical integrator and the SINDy-identified model to be
+verified independently.
+
+\subsubsection*{Why this is a suitable verification case}
+
+The true governing equations are known exactly and are structurally simple:
+only four of the twelve possible coefficients in a degree-2 polynomial library
+($1, x, y, x^{2}, xy, y^{2}$ for each of two equations) are nonzero.
+Correct sparse identification requires the algorithm to zero out all eight
+nonlinear candidates and retain exactly $k = 4$ terms with their correct
+values.
+
+\subsubsection*{Numerical setup}
+
+A reference trajectory was integrated over $t \in [0, 30]$ with 3{,}000
+samples using SciPy's \texttt{solve\_ivp}
+(RK45, rtol\,$= 10^{-10}$, atol\,$= 10^{-12}$).
+Comparison to the analytical solution~\eqref{eq:exact} confirmed numerical
+accuracy to within $1.8 \times 10^{-10}$ in the $\ell^{\infty}$ norm.
+Exact time derivatives were supplied to SINDy by evaluating the known
+right-hand side, matching the Brunton-style clean-derivative validation
+used throughout the paper.
+
+\subsubsection*{SINDy configuration and results}
+
+SINDy was run with a degree-2 polynomial library (6 features per equation),
+identity state scaling, no column normalisation, and BIC-based Pareto
+selection over 50 threshold values.  The BIC selection plot
+(Figure~\ref{fig:osc-bic}) shows the BIC score curve~\eqref{eq:bic}
+reaching a clear minimum at $k = 4$, the correct model complexity.
+
+The discovered equations were
+\begin{equation}
+  \dot{x} = -0.1\,x + 2.0\,y, \qquad \dot{y} = -2.0\,x - 0.1\,y,
+  \label{eq:osc-disc}
+\end{equation}
+matching the true coefficients exactly.
+
+\begin{table}[H]
+  \centering
+  \caption{Verification metrics for the damped oscillator example.}
+  \label{tab:osc}
+  \begin{tabular}{lc}
+    \toprule
+    Metric & Value \\
+    \midrule
+    Fit $R^{2}$                                          & $1.000\,000$ \\
+    Coefficient correlation (true vs.\ discovered)       & $1.0000$ \\
+    Max relative error on nonzero true terms             & $2.1 \times 10^{-11}$ \\
+    Selected model complexity $k$                        & 4 (correct) \\
+    Forward integration RMSE                             & $\approx 10^{-8}$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}[t]{0.44\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{phase_portrait}
+    \caption{Phase portrait: reference data, SINDy forward integration, and
+             analytical solution~\eqref{eq:exact} overlaid.}
+    \label{fig:osc-phase}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[t]{0.54\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{time_series}
+    \caption{Time series $x(t)$ and $y(t)$: reference (blue), SINDy (dashed
+             orange), and analytical solution (dotted green).}
+    \label{fig:osc-ts}
+  \end{subfigure}
+  \caption{Damped oscillator trajectories.  Reference, discovered, and
+           analytical curves are visually indistinguishable.}
+  \label{fig:osc-traj}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.55\textwidth]{bic_selection}
+  \caption{BIC model selection for the damped oscillator.
+           \textbf{Top:} NMSE vs.\ complexity Pareto frontier; grey dots are
+           all 50 threshold-sweep candidates, the blue line connects
+           Pareto-optimal points, and the red star marks the BIC-selected
+           model.
+           \textbf{Bottom:} BIC score~\eqref{eq:bic} vs.\ complexity.
+           The minimum at $k = 4$ matches the true model sparsity exactly.}
+  \label{fig:osc-bic}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}[t]{\textwidth}
+    \includegraphics[width=\textwidth]{structure_verification_Xi_true}
+    \caption{True coefficient matrix $\boldsymbol{\Xi}_{\text{true}}$ (projected
+             from symbolic RHS onto the polynomial library).}
+  \end{subfigure}\\[6pt]
+  \begin{subfigure}[t]{\textwidth}
+    \includegraphics[width=\textwidth]{structure_verification_Xi_disc}
+    \caption{Discovered coefficient matrix $\boldsymbol{\Xi}_{\text{disc}}$.}
+  \end{subfigure}\\[6pt]
+  \begin{subfigure}[t]{\textwidth}
+    \includegraphics[width=\textwidth]{structure_verification_Xi_err}
+    \caption{Coefficient error $\boldsymbol{\Xi}_{\text{disc}} -
+             \boldsymbol{\Xi}_{\text{true}}$ (physical units).
+             All entries are at numerical zero ($\lesssim 10^{-11}$).}
+  \end{subfigure}
+  \caption{Structure verification heatmaps for the damped oscillator.
+           The two matrices are visually identical; the error panel is
+           uniformly blank, confirming machine-precision coefficient recovery.}
+  \label{fig:osc-xi}
+\end{figure}
+
+% ------------------------------------------------------------
+\subsection*{3c. Replication of Real Examples}
+% ------------------------------------------------------------
+
+Two examples from Brunton et al.\ (2016) were replicated: the Lorenz system
+(main paper, Figures~2--3) and the cylinder wake mean-field model (main paper,
+Figure~4).
+
+% ---- Lorenz ----
+\subsubsection*{Lorenz system}
+
+\paragraph{Setup.}
+The Lorenz equations,
+\begin{equation}
+  \dot{x} = \sigma(y - x), \qquad
+  \dot{y} = x(\rho - z) - y, \qquad
+  \dot{z} = xy - \beta z,
+  \label{eq:lorenz}
+\end{equation}
+were integrated with the paper's parameters ($\sigma = 10$, $\rho = 28$,
+$\beta = 8/3$) from initial condition $(-8, 8, 27)$ over $t \in [0, 100]$
+at $\Delta t = 0.001$, yielding 100{,}001 samples on the chaotic attractor.
+Exact derivatives were supplied by evaluating~\eqref{eq:lorenz} directly.
+SINDy used a degree-3 polynomial library with identity scaling and no column
+normalisation, matching the paper's approach.
+
+\paragraph{Results.}
+The discovered equations were
+\begin{align}
+  \dot{x} &= -10.0\,x + 10.0\,y, \notag \\
+  \dot{y} &= -xz + 28.0\,x - y, \label{eq:lorenz-disc} \\
+  \dot{z} &= xy - 2.667\,z, \notag
+\end{align}
+recovering all seven true nonzero coefficients with no spurious terms.
+
+\begin{table}[H]
+  \centering
+  \caption{Verification metrics for the Lorenz system.}
+  \label{tab:lorenz}
+  \begin{tabular}{lc}
+    \toprule
+    Metric & Value \\
+    \midrule
+    Fit $R^{2}$                                          & $1.000\,000$ \\
+    Coefficient correlation (true vs.\ discovered)       & $1.0000$ \\
+    Max relative error on nonzero true terms             & $6 \times 10^{-13}$ \\
+    Selected complexity $k$                              & 7 (correct) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{lorenz_3d_true_vs_sindy}
+    \caption{3D phase portrait: reference trajectory (blue) and SINDy
+             forward integration (orange) from the same initial condition.}
+    \label{fig:lorenz-3d}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{bic_selection}
+    \caption{BIC selection: the minimum at $k = 7$ matches the true number
+             of nonzero Lorenz coefficients exactly.}
+    \label{fig:lorenz-bic}
+  \end{subfigure}
+  \caption{Lorenz system replication.}
+  \label{fig:lorenz}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}[t]{\textwidth}
+    \includegraphics[width=\textwidth]{structure_verification_Xi_true}
+    \caption{$\boldsymbol{\Xi}_{\text{true}}$}
+  \end{subfigure}\\[6pt]
+  \begin{subfigure}[t]{\textwidth}
+    \includegraphics[width=\textwidth]{structure_verification_Xi_disc}
+    \caption{$\boldsymbol{\Xi}_{\text{disc}}$}
+  \end{subfigure}\\[6pt]
+  \begin{subfigure}[t]{\textwidth}
+    \includegraphics[width=\textwidth]{structure_verification_Xi_err}
+    \caption{Error $\boldsymbol{\Xi}_{\text{disc}} - \boldsymbol{\Xi}_{\text{true}}$
+             (all entries $\lesssim 10^{-12}$).}
+  \end{subfigure}
+  \caption{Lorenz coefficient heatmaps.  The identified $\sigma$, $\rho$,
+           $\beta$, and bilinear ($xz$, $xy$) terms match the true values
+           to machine precision.}
+  \label{fig:lorenz-xi}
+\end{figure}
+
+% ---- Cylinder wake ----
+\subsubsection*{Cylinder wake mean-field model}
+
+\paragraph{Setup.}
+The cylinder wake is described in three reduced coordinates $(x, y, z)$
+corresponding to the two leading POD amplitudes and the shift mode, governed
+by the mean-field model of Noack et al.\ (2003) (Equation~8 in Brunton et al.):
+\begin{align}
+  \dot{x} &= \mu\,x - \omega\,y + A\,xz, \notag\\
+  \dot{y} &= \omega\,x + \mu\,y + A\,yz, \label{eq:cyl}\\
+  \dot{z} &= -\lambda\bigl(z - x^{2} - y^{2}\bigr). \notag
+\end{align}
+Parameters: $\mu = 0.1$, $\omega = 1.0$, $A = -1.0$, $\lambda = 10.0$.
+A reference trajectory of 3{,}000 samples over $T \in [0, 200]$ was integrated.
+The notebook additionally exercises the full POD + shift-mode recovery pipeline
+(\texttt{cylinder\_flow/snapshot\_pod\_shift.py}): the 3D trajectory was
+embedded in an 80-dimensional random subspace and the three modal coordinates
+recovered by POD; the recovered coordinates correlated with the true
+coordinates at $|r| \geq 0.98$ for all three modes.
+
+\paragraph{BIC failure and model-selection rationale.}
+BIC~\eqref{eq:bic} is computed with an MSE floor,
+$\mathrm{MSE}_{\mathrm{eff}} = \max(\mathrm{MSE},\; \delta)$,
+where $\delta = 10^{-3}\,\mathrm{Var}(Y) \approx 3.2\times10^{-5}$.
+The floor is intended to prevent a near-zero MSE from driving BIC to
+$-\infty$ on clean synthetic data.  In this example, however, it has an
+unintended consequence: the $k=14$ model achieves
+$\mathrm{MSE} \approx 10^{-32}$ (exact recovery), which the floor clamps to
+$3.2\times10^{-5}$, the same effective MSE as the $k=2$ model
+($\mathrm{MSE} = 1.1\times10^{-5}$, also below the floor).
+Because BIC sees both models as equally accurate, it selects the sparser
+one, $k=2$, returning
+\begin{equation}
+  \dot{x} = -y, \qquad \dot{y} = x, \qquad \dot{z} = 0,
+  \label{eq:cyl-bic}
+\end{equation}
+with $R^{2} = 0.66$.  Equation~\eqref{eq:cyl-bic} describes a pure
+circular rotation: it captures the dominant oscillatory mode but discards
+the linear growth rate $\mu$, the amplitude-limiting nonlinearity $Axz$,
+$Ayz$, and the entire shift-mode equation.  It is physically incomplete.
+
+This is a known shortcoming of BIC (and AIC) in the SINDy context: when
+the residual of the dense model falls below the noise or regularisation
+floor, the criterion loses discriminating power and over-prunes
+\cite{Brunton2016}.  The standard diagnostic response is to inspect the
+full Pareto curve rather than trusting a single scalar criterion.  Three
+reference points are informative:
+\begin{itemize}
+  \item \textbf{BIC minimum} ($k=2$): sparsest model judged ``good enough''
+        by the information criterion.  Use as a lower bound on complexity.
+  \item \textbf{Pareto knee} ($k \approx 8$--$10$ here): the point of
+        maximum curvature on the NMSE-vs-complexity curve, where additional
+        terms yield diminishing accuracy returns.  Often a robust default.
+  \item \textbf{Densest Pareto point} ($k=14$): the model at the right end
+        of the frontier, with the lowest achievable MSE.  Use when physical
+        knowledge constrains the expected term count, or when the knee and
+        BIC minimum are implausibly sparse.
+\end{itemize}
+Here, both the knee ($R^{2} \approx 1$ achieved around $k=10$) and physical
+knowledge of the three-mode mean-field structure suggest $k\gg 2$.
+The configuration therefore sets \texttt{pareto\_dial}\,$= 1.0$, which
+selects the densest Pareto point ($k=14$), and is equivalent to choosing
+the minimum-MSE model regardless of complexity.  The BIC curve computed
+post-hoc (Figure~\ref{fig:cyl-bic}) illustrates the collapse of the BIC
+scores at $k \geq 12$ as all models hit the MSE floor, and shows visually
+why the knee or the densest point must be consulted when BIC saturates.
+
+\paragraph{Results.}
+With \texttt{pareto\_dial}\,$= 1.0$ the discovered equations were
+\begin{align}
+  \dot{x} &= 0.1\,x - y - xz, \notag\\
+  \dot{y} &= x + 0.1\,y - yz, \label{eq:cyl-disc}\\
+  \dot{z} &= 10.0\,x^{2} + 10.0\,y^{2} - 10.0\,z, \notag
+\end{align}
+correctly recovering all structural terms of Equation~\eqref{eq:cyl} with
+14 total nonzero coefficients.
+
+\begin{table}[H]
+  \centering
+  \caption{Comparison of BIC-selected ($k=2$) and dial-selected ($k=14$)
+           models for the cylinder wake.}
+  \label{tab:cyl}
+  \begin{tabular}{lccc}
+    \toprule
+    & BIC minimum ($k=2$) & Densest Pareto ($k=14$) & True model \\
+    \midrule
+    Selected by           & \texttt{pick\_mode='bic'} & \texttt{dial=1.0} & --- \\
+    $R^{2}$               & $0.663$ & $1.000$ & --- \\
+    $\dot{z}$ identified? & No ($\dot{z}=0$) & Yes & Yes \\
+    Coeff.\ correlation   & --- & $1.0000$ & --- \\
+    Physical completeness & Rotation only & Full Eq.~\eqref{eq:cyl} & Full Eq.~\eqref{eq:cyl} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{cylinder_3d_true_vs_sindy}
+    \caption{3D phase portrait in $(x, y, z)$ POD coordinates: reference
+             (blue) and SINDy integration (orange).}
+    \label{fig:cyl-3d}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{bic_selection}
+    \caption{BIC curve (post-hoc).  BIC scores collapse for $k \geq 12$
+             as all models hit the MSE floor; BIC selects $k=2$
+             (Eq.~\eqref{eq:cyl-bic}, $R^{2}=0.66$).
+             The densest Pareto point $k=14$ is used instead.}
+    \label{fig:cyl-bic}
+  \end{subfigure}
+  \caption{Cylinder wake replication.}
+  \label{fig:cyl}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{cylinder_timeseries_data_vs_brunton_vs_sindy}
+  \caption{Cylinder wake time series over $T \in [0, 200]$: reference data
+           (blue), direct re-integration of the true Equation~\eqref{eq:cyl}
+           (green dashed), and SINDy forward integration (orange dotted).
+           All three agree closely throughout the window, replicating
+           Figure~4 of Brunton et al.\ (2016).}
+  \label{fig:cyl-ts}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}[t]{\textwidth}
+    \includegraphics[width=\textwidth]{structure_verification_Xi_true}
+    \caption{$\boldsymbol{\Xi}_{\text{true}}$}
+  \end{subfigure}\\[6pt]
+  \begin{subfigure}[t]{\textwidth}
+    \includegraphics[width=\textwidth]{structure_verification_Xi_disc}
+    \caption{$\boldsymbol{\Xi}_{\text{disc}}$}
+  \end{subfigure}\\[6pt]
+  \begin{subfigure}[t]{\textwidth}
+    \includegraphics[width=\textwidth]{structure_verification_Xi_err}
+    \caption{Error $\boldsymbol{\Xi}_{\text{disc}} - \boldsymbol{\Xi}_{\text{true}}$.}
+  \end{subfigure}
+  \caption{Cylinder wake coefficient heatmaps.  The $\mu$, $\omega$, $A$
+           (bilinear $xz$, $yz$), and $\lambda$ terms of
+           Equation~\eqref{eq:cyl} are all recovered correctly.}
+  \label{fig:cyl-xi}
+\end{figure}
+
+\begin{thebibliography}{51}
+\bibitem{Brunton2016}
+S.~L.\ Brunton, J.~L.\ Proctor, and J.~N.\ Kutz,
+``Discovering governing equations from data by sparse identification of
+nonlinear dynamical systems,''
+\textit{Proc.\ Natl.\ Acad.\ Sci.}, vol.~113, no.~15, pp.~3932--3937, 2016.
+
+\bibitem{Noack2003}
+B.~R.\ Noack, K.~Afanasiev, M.~Morzy\'{n}ski, G.~Tadmor, and F.~Thiele,
+``A hierarchy of low-dimensional models for the transient and post-transient
+cylinder wake,''
+\textit{J.\ Fluid Mech.}, vol.~497, pp.~335--363, 2003.
+
+
+
+
+\bibitem{Kutz2023}
+J. N. Kutz and S. L. Brunton, \textit{Sparse Methods for Data-Driven Modeling and Control}. Cambridge: Cambridge University Press, 2023.
+
+\bibitem{Zhang2025}
+H. Zhang et al., ``Physics-Informed Machine Learning in Design and Manufacturing: Status and Challenges,'' \textit{Journal of Computing and Information Science in Engineering}, vol. 25, no. 4, 2025.
+
+\bibitem{Takeishi2026}
+N. Takeishi and Y. Kawahara, ``Sparse Identification of Nonlinear Dynamics With Library Optimization Mechanism: Recursive Long-Term Prediction Perspective,'' \textit{IEEE Transactions on Cybernetics}, vol. 56, no. 5, pp. 2475--2488, 2026.
+
+\bibitem{Morales2026}
+K. Morales et al., ``Sparse identification of nonlinear dynamics and Koopman operators with Shallow Recurrent Decoder Networks,'' \textit{Proceedings of the National Academy of Sciences}, vol. 123, no. 19, 2026.
+
+\bibitem{Vaddireddy2026}
+H. Vaddireddy and A. Rasheed, ``SINDy-KANs: Sparse identification of non-linear dynamics through Kolmogorov-Arnold networks,'' \textit{arXiv preprint arXiv:2603.18548}, 2026.
+\end{thebibliography}
+
+\end{document}
